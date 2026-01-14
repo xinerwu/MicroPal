@@ -34,8 +34,16 @@ if (dformat==1){
 #auto-completing using the join function from the analogue package
 dat <- join(taxa,tmpdata)
 
-#extract target data set from the merged data sets and save as tab delimited text file
+#extract target data set from the merged data sets
 tardata <- dat$tmpdata
+
+#check if the number of variables (columns) in 'tardata' matches 'taxa'
+if (ncol(tardata) != ncol(taxa)) {
+  stop(paste("Mismatch detected: we now have", ncol(tardata), 
+             "taxa, but the database has", ncol(taxa), ". We stop. Double-check your taxa abbreviations."))
+}
+
+#save as tab delimited text file
 df <- cbind(stations = rownames(tardata), tardata)
 write.table(df,outname,sep = "\t",quote = FALSE, col.names = TRUE, row.names = FALSE,)
 print("Done!")
