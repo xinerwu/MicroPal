@@ -5,19 +5,26 @@ library(analogue)
 
 dino <- read.delim('dino1968.txt',row.names=1)
 envi <- read.delim('envi1968.txt',row.names=1)
-core <- read.delim('dino1968.txt',row.names=1)
+core <- read.delim('testcore.txt',row.names=1)
 n.analogues <- 5
-output_file_name <- 'test_predictions.csv'
+output_file_name <- 'testcore.csv'
 
-# Optional: Specify environmental variables to be reconstructed
-# eg.: env_id <- 2:18
-# reconstruct all variables by default
-env_id <- 1:ncol(envi)
+# No bootstrapping by default, we use LOO for cross validation
+# But if you do want to bootstrap, set bootstrap <- TRUE
+# use n.boot=100 for testing/debugging, 1000 for formal analysis/publication
+bootstrap <- FALSE
+n.boot <- 100 
+
+# Reconstruct all variables (could take time, depends on the performance of your computer):
+# target_env <- colnames(envi)
+# Or specify environmental variables to be reconstructed:
+target_env <- c('Ssummer','Swinter','Tsummer','Twinter','SeaIceC','SeaIcemonths','gCYC0217')
 
 # Manually apply log transformation 
 # because log-distance isn't one of the built-in methods
 modern <- log(dino+1)
 fossil <- log(core+1)
+method <- "euclidean"
 
 # Set output directory
 output_dir <- './MATrecons'
@@ -25,37 +32,105 @@ if (!dir.exists(output_dir)) {
   dir.create(output_dir)
 }
 output_file <- file.path(output_dir, output_file_name)
+pattern <- sub("\\.csv$", "", output_file)
+
+# Remove duplicates in the training database
+dup <- c("1101","1102","1100","1105")
+modern <- modern[ !rownames(modern) %in% dup, ]
+envi <- envi[ !rownames(envi) %in% dup, ]
 
 # Check if models already exist
 model_file <- 'MATmodels1968.RData'
-if (file.exists(model_file)) {
+answer <- utils::askYesNo("Use exiting MAT models (Yes) or create new (No)?")
+if (file.exists(model_file) && isTRUE(answer)) {
   # Load the existing data
   load(model_file)
   print("Loaded existing MAT models.")
 } else {
   # Fit MAT model
-  mat_models <- vector("list",length=length(env_id))
-  names(mat_models) <- colnames(envi)[env_id]
+  print("Creating MAT models...")
+  n_env=length(target_env)
+  mat_models <- vector("list",length=n_env)
+  names(mat_models) <- target_env
+  
+  pdf("Summary_MATmodels.pdf")
+  sink(file = "Validation_MATmodels.txt")
+  cat("========================================\n")
+  cat("Model Validation Results\n")
+  cat("Analysis Started at:", format(Sys.time(),"%Y-%m-%d %H:%M:%S"), "\n")
+  cat("========================================\n\n")
+  
   # loop through each environmental variable
   c=1
-  for (i in env_id) {
-    env <- envi[, i]
-    mat_model <- mat(modern,env,method="euclidean",k=n.analogues)
+  for (i in 1:n_env) {
+    env <- envi[[target_env[i]]]
+    cat(paste("Variable:", target_env[i]), "\n")
+    mat_model <- mat(modern,env,method=method,k=n.analogues,weighted=TRUE)
     mat_models[[c]] <- mat_model
     c=c+1
+    par(mfrow = c(2, 2),oma = c(0, 0, 2, 0))
+    plot(mat_model,sub.caption = target_env[i],weighted = TRUE,k=n.analogues)
+    cat("The RMSEP values are from the leave-one-out (LOO) cross-validation.\n")
+    print(mat_model)
+    if (bootstrap) {
+    boot<-bootstrap(mat_model,k=n.analogues,weighted = TRUE,n.boot = n.boot)
+    cat(paste("Bootstrap-derived RMSEP using",n.analogues,"analogues and",n.boot,"bootstrap cycles is: ",RMSEP(boot, type="standard"),"\n\n\n"))
+    }
   }
+  
   save(mat_models,names,file=model_file)
+  dev.off()
+  sink()
   print("Created MAT models.")
+  print("Saved model summary diagrams and validation results.")
 }
-pred_list <- lapply(mat_models,function(model) predict(model,fossil)$predictions$model$predicted[n.analogues, ])
+
+# Extract the analogues and their distance
+print("Processing fossil assemblages...")
+ana <- analog(modern,fossil,method = method)
+ana_file <- paste0(pattern,"_analogues.txt")
+sink(file = ana_file)
+print(summary(ana))
+sink()
+print(paste("Saved close modern analogues to",ana_file))
+
+# Run predictions for fossil samples and export the results
+pred_list <- lapply(mat_models,function(model) predict(model,fossil,k=n.analogues,weighted=TRUE)$predictions$model$predicted[n.analogues, ])
 pred_matrix <- do.call(cbind,pred_list)
 colnames(pred_matrix) <- names(mat_models)
 write.csv(pred_matrix, file = output_file)
 print(paste("Reconstructions saved to",output_file))
+
+# Extract the range of analogue env values
+get_env_ranges <- function(fossil_row_dists,k,env_matrix){
+  sorted_dists <- sort(fossil_row_dists)
+  top_names <- names(sorted_dists)[1:k]
+  # 'drop = FALSE' ensures it remains a matrix even if we only have 1 variable
+  subset_env <- env_matrix[top_names, ,drop=FALSE]
+  ranges <- apply(subset_env,2,range,na.rm=TRUE)
+  return(ranges)
+}
+dists <- ana$analogs
+results_list <- apply(dists,2,get_env_ranges,k=n.analogues,env_matrix=envi[,target_env],simplify = FALSE)
+ranges_df <- do.call(rbind,lapply(results_list,as.vector))
+ranges_colnames <- paste0(rep(target_env,each=2),"_",c("Min","Max"))
+colnames(ranges_df) <- ranges_colnames
+rownames(ranges_df) <- colnames(dists)
+ranges_file <- paste0(pattern,"_ranges.csv")
+write.csv(ranges_df,file=ranges_file)
+
+# Prepare plots
 depths <- as.numeric(rownames(core))
-par(mfrow = c(2, 2))
-reconPlot(pred_list$Ssummer, depths = depths, ylab = "Summer SSS (psu)", xlab = "Samples")
-reconPlot(pred_list$Tsummer, depths = depths, ylab = "Summer SST (degC)", xlab = "Samples")
-reconPlot(pred_list$SeaIcemonths, depths = depths, ylab = "Sea ice cover (month/year)", xlab = "Samples")
-reconPlot(pred_list$gCYC0217, depths = depths, ylab = "Annual primary productivity", xlab = "Samples")
+# old plotting code
+#opar <- par(mfrow = c(2, 2))
+#reconPlot(pred_list$Ssummer, depths = depths, ylab = "Summer SSS (psu)", xlab = "Age/depth")
+#reconPlot(pred_list$Tsummer, depths = depths, ylab = "Summer SST (degC)", xlab = "Age/depth")
+#reconPlot(pred_list$SeaIcemonths, depths = depths, ylab = "Sea ice cover (month/year)", xlab = "Age/depth")
+#reconPlot(pred_list$gCYC0217, depths = depths, ylab = "Annual primary productivity", xlab = "Age/depth")
+#par(opar)
+pdf(paste0(pattern,"_preview.pdf"))
+Stratiplot(pred_matrix,depths,varTypes='absolute',ylab="Age/depth")
+dc <- minDC(ana)
+plot(dc,depths,xlab="Age/depth")
+dev.off()
 print("Prepared plots for preview.")
