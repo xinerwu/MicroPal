@@ -7,7 +7,7 @@ dino <- read.delim('dino1968.txt',row.names=1)
 envi <- read.delim('envi1968.txt',row.names=1)
 core <- read.delim('testcore.txt',row.names=1)
 n.analogues <- 5
-output_file_name <- 'testcore.csv'
+output_file_name <- 'testcore'
 
 # No bootstrapping by default, we use LOO for cross validation
 # But if you do want to bootstrap, set bootstrap <- TRUE
@@ -31,8 +31,8 @@ output_dir <- './MATrecons'
 if (!dir.exists(output_dir)) {
   dir.create(output_dir)
 }
-output_file <- file.path(output_dir, output_file_name)
-pattern <- sub("\\.csv$", "", output_file)
+pattern <- file.path(output_dir, output_file_name)
+output_file <- paste0(pattern,".csv")
 
 # Remove duplicates in the training database
 dup <- c("1101","1102","1100","1105")
