@@ -41,7 +41,7 @@ envi <- envi[ !rownames(envi) %in% dup, ]
 
 # Check if models already exist
 model_file <- 'MATmodels1968.RData'
-answer <- utils::askYesNo("Use exiting MAT models (Yes) or create new (No)?")
+answer <- utils::askYesNo("Use existing MAT models (Yes) or create new (No)?")
 if (file.exists(model_file) && isTRUE(answer)) {
   # Load the existing data
   load(model_file)
@@ -134,3 +134,4 @@ dc <- minDC(ana)
 plot(dc,depths,xlab="Age/depth")
 dev.off()
 print("Prepared plots for preview.")
+print("Done!")
