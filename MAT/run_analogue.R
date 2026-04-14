@@ -3,11 +3,21 @@
 # Notes: to view source code eg: getAnywhere(reconPlot.predict.mat)
 library(analogue)
 
-dino <- read.delim('dino1968.txt',row.names=1)
+# Import modern reference species data file
+spec <- read.delim('dino1968.txt',row.names=1)
+# Import modern reference environmental variables file
 envi <- read.delim('envi1968.txt',row.names=1)
+# Import fossil species data file
 core <- read.delim('testcore.txt',row.names=1)
-n.analogues <- 5
+# Name for output files:
 output_file_name <- 'testcore'
+
+# Change the number of analogues if wanted
+n.analogues <- 5
+# Choose the distance method
+method <- "euclidean"
+# Are you using dinocyst?
+isDinocyst <- TRUE
 
 # No bootstrapping by default, we use LOO for cross validation
 # But if you do want to bootstrap, set bootstrap <- TRUE
@@ -20,11 +30,22 @@ n.boot <- 100
 # Or specify environmental variables to be reconstructed:
 target_env <- c('Ssummer','Swinter','Tsummer','Twinter','SeaIceC','SeaIcemonths','gCYC0217')
 
-# Manually apply log transformation 
+# Name of the file containing MAT models that will be used/created
+model_file <- 'MATmodels1968.RData'
+
+################# No modification necessary below this line ####################
+######################## Unless you know what to do ############################
+
+# Manually apply log transformation if using dinocyst
 # because log-distance isn't one of the built-in methods
-modern <- log(dino+1)
-fossil <- log(core+1)
-method <- "euclidean"
+if (isDinocyst) {
+  modern <- log(spec+1)
+  fossil <- log(core+1)
+  # Remove duplicates in the dinocyst training database
+  dup <- c("1101","1102","1100","1105")
+  modern <- modern[ !rownames(modern) %in% dup, ]
+  envi <- envi[ !rownames(envi) %in% dup, ]
+}
 
 # Set output directory
 output_dir <- './MATrecons'
@@ -34,13 +55,7 @@ if (!dir.exists(output_dir)) {
 pattern <- file.path(output_dir, output_file_name)
 output_file <- paste0(pattern,".csv")
 
-# Remove duplicates in the training database
-dup <- c("1101","1102","1100","1105")
-modern <- modern[ !rownames(modern) %in% dup, ]
-envi <- envi[ !rownames(envi) %in% dup, ]
-
 # Check if models already exist
-model_file <- 'MATmodels1968.RData'
 answer <- utils::askYesNo("Use existing MAT models (Yes) or create new (No)?")
 if (file.exists(model_file) && isTRUE(answer)) {
   # Load the existing data
@@ -121,13 +136,6 @@ write.csv(ranges_df,file=ranges_file)
 
 # Prepare plots
 depths <- as.numeric(rownames(core))
-# old plotting code
-#opar <- par(mfrow = c(2, 2))
-#reconPlot(pred_list$Ssummer, depths = depths, ylab = "Summer SSS (psu)", xlab = "Age/depth")
-#reconPlot(pred_list$Tsummer, depths = depths, ylab = "Summer SST (degC)", xlab = "Age/depth")
-#reconPlot(pred_list$SeaIcemonths, depths = depths, ylab = "Sea ice cover (month/year)", xlab = "Age/depth")
-#reconPlot(pred_list$gCYC0217, depths = depths, ylab = "Annual primary productivity", xlab = "Age/depth")
-#par(opar)
 pdf(paste0(pattern,"_preview.pdf"))
 Stratiplot(pred_matrix,depths,varTypes='absolute',ylab="Age/depth")
 dc <- minDC(ana)
