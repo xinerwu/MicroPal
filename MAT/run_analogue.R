@@ -45,6 +45,9 @@ if (isDinocyst) {
   dup <- c("1101","1102","1100","1105")
   modern <- modern[ !rownames(modern) %in% dup, ]
   envi <- envi[ !rownames(envi) %in% dup, ]
+} else {
+  modern <- spec
+  fossil <- core
 }
 
 # Set output directory
