@@ -93,7 +93,7 @@ if (file.exists(model_file) && isTRUE(answer)) {
   for (i in 1:n_env) {
     env <- envi[[target_env[i]]]
     cat(paste("Variable:", target_env[i]), "\n")
-    mat_model <- mat(modern,env,method=method,k=n.analogues,weighted=TRUE)
+    mat_model <- mat(modern,env,method=method,k=n.analogues*2,weighted=TRUE)
     mat_models[[c]] <- mat_model
     c=c+1
     par(mfrow = c(2, 2),oma = c(0, 0, 2, 0))
