@@ -50,6 +50,16 @@ if (isDinocyst) {
   fossil <- core
 }
 
+# As this seems to occur pretty often, safety check for duplicates
+if (any(duplicated(modern))){
+  warning("There are duplicates in your calibration dataset (identical species 
+          rows). Use CheckDuplicates.R to inspect these rows. For now we just 
+          remove the repeated rows to be able to move forward.", call. = FALSE)
+  dup_rows <- duplicated(modern)
+  modern <- modern[!dup_rows, ]
+  envi <- envi[!dup_rows, ]
+}
+
 # Set output directory
 output_dir <- './MATrecons'
 if (!dir.exists(output_dir)) {
