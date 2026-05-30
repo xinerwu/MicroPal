@@ -4,7 +4,7 @@ library(ggplot2)
 library(tidyr)
 library(dplyr)
 library(sf)
-library(ggforce)
+library(patchwork)
 library(rnaturalearth)
 library(tibble)
 
@@ -90,72 +90,57 @@ reference_point_sf <- st_as_sf(
 mapping_sf <- mapping_sf %>%
   mutate(sample_id = round(as.numeric(sample_id),3))
 
-# Create the faceted map
-map <- ggplot() +
-  # Add the world map background first
-  geom_sf(data = world, fill = "gray90", color = "white") +
-  # Add the core site
-  geom_sf(data = reference_point_sf, color = "red", size = 3, shape = 4) +
-  # Add your specific analogue sites on top
-  geom_sf(data = mapping_sf, aes(color = distance), size = 2) +
-  # Focus on the DB region
-  coord_sf(ylim = c(min(coor$Latitude), 90)) +
-  ## Split the maps by sample_id
-  #facet_wrap(~ sample_id, labeller = as_labeller(function(id) paste(id, sample_id_unit))) +
-  # The continuous colormap
-  scale_color_viridis_c(option = "viridis", name = "Analogue\nDistance") +
-  #theme_minimal() +
-  theme_bw() +
-  theme(
-    axis.text = element_text(size = 6),
-    axis.title = element_blank(),
-    strip.background = element_rect(fill = "gray20"),
-    strip.text = element_text(color = "white", face = "bold"),
-    legend.position = "bottom"
-  ) +
-  labs(title = "Closest 5 Analogues per Sample",
-       subtitle = "Blue diamond indicates core site")
+plot_list <- list()
+unique_samples <- sort(unique(mapping_sf$sample_id))
 
-# Set up grid for a single page
-page_rows <- 8
-page_cols <- 3
+# Create the maps one by one and store in the list
+for (current_sample in unique_samples) {
+  single_sample_data <- mapping_sf %>%
+    filter(sample_id == current_sample)
+  p <- ggplot() +
+    # Add the world map background first
+    geom_sf(data = world, fill = "gray90", color = "white") +
+    # Add the core site
+    geom_sf(data = reference_point_sf, color = "red", size = 2.5, shape = 4) +
+    # Add your specific analogue sites on top
+    geom_sf(data = single_sample_data, aes(color = distance), size = 1.5) +
+    # Focus on the DB region
+    coord_sf(ylim = c(min(coor$Latitude), 90)) +
+    # The continuous colormap
+    scale_color_viridis_c(option = "viridis", name = "Analogue\nDistance",
+                          limits = c(min_dist, max_dist)) +
+    theme_bw() +
+    labs(title = paste(current_sample, sample_id_unit)) +
+    theme(
+      axis.text = element_text(size = 6),
+      axis.title = element_blank(),
+      plot.title = element_text(size = 10, face = "bold"),
+    )
+  plot_list[[as.character(current_sample)]] <- p
+}
 
-# We build a temporary plot just to let ggforce do the math
-temp_plot <- map + 
-  facet_wrap_paginate(
-    ~ sample_id, 
-    ncol = page_cols, 
-    nrow = page_rows, 
-    page = 1
-  )
-
-total_pages <- n_pages(temp_plot)
+plots_per_page <- 24
+chunked_plots <- split(plot_list, ceiling(seq_along(plot_list) / plots_per_page))
 
 # Export to PDF
 pdf(out_name, width = 8.5, height = 11)
 
 # Loop through the pages and print them to the PDF
-for (i in 1:total_pages) {
+for (i in seq_along(chunked_plots)) {
+  page_plots <- chunked_plots[[i]]
   
-  # Add the paginated facet layer for the current page 'i'
-  p <- map +
-    facet_wrap_paginate(
-      ~ sample_id, 
-      ncol = page_cols, 
-      nrow = page_rows, 
-      labeller = as_labeller(function(id) paste(id, sample_id_unit)),
-      page = i
-    )
-  
-  # Print sends the plot to the open PDF device (creating a new page)
-  print(p)
-  
-  # Optional: Print progress to the console
-  message(sprintf("Printing page %d of %d...", i, total_pages))
+  page_grid <- wrap_plots(page_plots,ncol = 3, nrow = 8) +
+    plot_layout(guides = "collect") +
+    plot_annotation(
+      title = "Closest 5 Analogues per Sample",
+      subtitle = "Red cross indicates core site"
+    ) &
+    theme(legend.position = "bottom")
+  print(page_grid)
+  message(sprintf("Printing page %d of %d...", i, length(chunked_plots)))
 }
 
-# 6. Close the PDF device (CRITICAL STEP)
-# If you don't run dev.off(), the file will be locked and corrupted
+# 6. Close the PDF device
 dev.off()
 
 message("Map of the analogues successfully generated!")
