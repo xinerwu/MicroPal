@@ -36,6 +36,10 @@ model_file <- 'MATmodels1968.RData'
 ################# No modification necessary below this line ####################
 ######################## Unless you know what to do ############################
 
+# Temporarily increase the print limit
+old_limit <- getOption("max.print")
+options(max.print = 1000000)
+
 # Manually apply log transformation if using dinocyst
 # because log-distance isn't one of the built-in methods
 if (isDinocyst) {
@@ -73,10 +77,10 @@ answer <- utils::askYesNo("Use existing MAT models (Yes) or create new (No)?")
 if (file.exists(model_file) && isTRUE(answer)) {
   # Load the existing data
   load(model_file)
-  print("Loaded existing MAT models.")
+  message("Loaded existing MAT models.")
 } else {
   # Fit MAT model
-  print("Creating MAT models...")
+  message("Creating MAT models...")
   n_env=length(target_env)
   mat_models <- vector("list",length=n_env)
   names(mat_models) <- target_env
@@ -109,25 +113,45 @@ if (file.exists(model_file) && isTRUE(answer)) {
   save(mat_models,names,file=model_file)
   dev.off()
   sink()
-  print("Created MAT models.")
-  print("Saved model summary diagrams and validation results.")
+  message("Created MAT models.")
+  message("Saved model summary diagrams and validation results.")
 }
 
 # Extract the analogues and their distance
-print("Processing fossil assemblages...")
+message("Processing fossil assemblages...")
 ana <- analog(modern,fossil,method = method)
 ana_file <- paste0(pattern,"_analogues.txt")
 sink(file = ana_file)
+# get a quick summary
 print(summary(ana))
+# create a better arranged matrix for post-processing
+dist_mat <- ana$analogs
+samples <- colnames(dist_mat)
+sites <- rownames(dist_mat)
+top_sites <- matrix(NA, nrow = length(samples), ncol = n.analogues, 
+                     dimnames = list(samples, 1:n.analogues))
+top_dists <- matrix(NA, nrow = length(samples), ncol = n.analogues, 
+                     dimnames = list(samples, 1:n.analogues))
+# loop through each sample (column) to find the n closest sites
+for(i in seq_along(samples)) {
+  current_dists <- dist_mat[, i]
+  closest_idx <- order(current_dists)[1:n.analogues]
+  top_sites[i, ] <- sites[closest_idx]
+  top_dists[i, ] <- current_dists[closest_idx]
+}
+cat("\n\n=== Top n Closest Sites (Names) ===\n")
+print(top_sites)
+cat("\n\n=== Top n Closest Sites (Distances) ===\n")
+print(top_dists)
 sink()
-print(paste("Saved close modern analogues to",ana_file))
+message(paste("Saved close modern analogues to",ana_file))
 
 # Run predictions for fossil samples and export the results
 pred_list <- lapply(mat_models,function(model) predict(model,fossil,k=n.analogues,weighted=TRUE)$predictions$model$predicted[n.analogues, ])
 pred_matrix <- do.call(cbind,pred_list)
 colnames(pred_matrix) <- names(mat_models)
 write.csv(pred_matrix, file = output_file)
-print(paste("Reconstructions saved to",output_file))
+message(paste("Reconstructions saved to",output_file))
 
 # Extract the range of analogue env values
 get_env_ranges <- function(fossil_row_dists,k,env_matrix){
@@ -154,5 +178,8 @@ Stratiplot(pred_matrix,depths,varTypes='absolute',ylab="Age/depth")
 dc <- minDC(ana)
 plot(dc,depths,xlab="Age/depth")
 dev.off()
-print("Prepared plots for preview.")
-print("Done!")
+message("Prepared plots for preview.")
+message("Done!")
+
+# Restore the original print limit
+options(max.print = old_limit)
