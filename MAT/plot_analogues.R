@@ -114,7 +114,7 @@ for (current_sample in unique_samples) {
     theme(
       axis.text = element_text(size = 6),
       axis.title = element_blank(),
-      plot.title = element_text(size = 10, face = "bold"),
+      plot.title = element_text(size = 9, face = "bold"),
     )
   plot_list[[as.character(current_sample)]] <- p
 }
@@ -122,12 +122,45 @@ for (current_sample in unique_samples) {
 plots_per_page <- 24
 chunked_plots <- split(plot_list, ceiling(seq_along(plot_list) / plots_per_page))
 
+# Prepare a blank map as a place holder to avoid shrinking problem
+empty_sf <- st_sf(st_drop_geometry(mapping_sf[0, ]), geometry = st_sfc(crs = 4326))
+empty_world <- world[0, ]
+empty_ref <- reference_point_sf[0, ]
+
+blank_map <- ggplot() +
+  geom_sf(data = empty_world, fill = "gray90", color = "white") +
+  geom_sf(data = empty_ref, color = "red", size = 2.5, shape = 4) +
+  geom_sf(data = empty_sf, aes(color = distance)) +
+  coord_sf(xlim = c(min(coor$Longitude), max(coor$Longitude)),
+           ylim = c(min(coor$Latitude), 90)) +
+  scale_color_viridis_c(option = "viridis", name = "Analogue\nDistance",
+                        limits = c(min_dist, max_dist)) +
+  theme_bw() +
+  labs(title = "Ghost") +
+  theme(
+    axis.text      = element_text(size = 6, color = "transparent"),
+    axis.ticks     = element_line(color = "transparent"),
+    plot.title     = element_text(size = 9, color = "transparent"),
+    legend.position = "none",
+    panel.background = element_rect(fill = "transparent"),
+    panel.border = element_blank(),
+    panel.grid     = element_blank()
+  )
+
 # Export to PDF
 pdf(out_name, width = 8.5, height = 11)
 
 # Loop through the pages and print them to the PDF
 for (i in seq_along(chunked_plots)) {
   page_plots <- chunked_plots[[i]]
+  
+  if (length(page_plots) < plots_per_page) {
+    empty_slots <- plots_per_page - length(page_plots)
+    
+    for (j in 1:empty_slots) {
+      page_plots[[length(page_plots) + 1]] <- blank_map # put a blank map in empty slots
+    }
+  }
   
   page_grid <- wrap_plots(page_plots,ncol = 3, nrow = 8) +
     plot_layout(guides = "collect") +
