@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "Wu"
+    given-names: "Xiner"
+    orcid: "https://orcid.org/0000-0002-4072-392X"
+title: "R and MATLAB Scripts for Micropaleontological Proxy Data Processing"
+version: 1.0.0
+date-released: 2026-05-31
+url: "https://github.com/xinerwu/MicroPal"
