@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/1117741690.svg)](https://doi.org/10.5281/zenodo.20494102)
+
 Scripts for formatting the input fossile files as required by Joel's scripts for running mat (also works for the 'analogue' package),
 and for running MAT reconstructions for single fossil files using the 'analogue' package (https://cran.r-project.org/package=analogue).
 For running MAT reconstructions in a batch  (i.e. a number of fossil files/cores one by one), see my other repository MLD-Nlab.
