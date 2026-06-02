@@ -36,7 +36,6 @@ out_name <- ana_file_name %>% sub("_.*", "",x=.) %>% paste0("_analogue_sites_map
 # Read analogue site name and dissimilarity
 all_lines <- readLines(ana_file_name)
 lines_to_skip <- grep("Top n Closest Sites", all_lines)
-#lines_to_skip <- target_line + 1
 analogues_name <- read.table(ana_file_name, skip=lines_to_skip[1], 
                              header = TRUE, check.names = FALSE, fill = TRUE, 
                              stringsAsFactors = FALSE,
