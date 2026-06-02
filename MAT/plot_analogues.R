@@ -1,4 +1,7 @@
-# plot the location of the n best analogues for each sample
+# Plot the location of the n best analogues for each sample
+# The expected format for the coordinates of your database points is a table 
+# with 3 columns, the column headers being: stations, Latitude, Longitude
+# The order of the columns can be different. R is case-sensitive.
 
 library(ggplot2)
 library(tidyr)
@@ -8,25 +11,26 @@ library(patchwork)
 library(rnaturalearth)
 library(tibble)
 
-# Specify the number of analogues used
-#n.analogues <- 5
-
 # Specify the unit of sample ID (eg. cm, ka BP, year BP)
 sample_id_unit <- "ka BP"
 
 # Enter your core site
 core_lon <- -58.03
 core_lat <- 61.46
- 
+
 # Import the analogue file
 ana_file_name <- 'MATrecons/P4_analogues.txt'
 # Import database coordinates file
 coor <- read.delim('coor1968.txt',header = TRUE)
 
+# Set map area
+ylim <- c(min(coor$Latitude), 90)
+xlim <- c(-180, 180)
+
 ################# No modification necessary below this line ####################
 ######################## Unless you know what to do ############################
 
-# OUtput file name
+# Output file name
 out_name <- ana_file_name %>% sub("_.*", "",x=.) %>% paste0("_analogue_sites_map.pdf")
 
 # Read analogue site name and dissimilarity
@@ -105,7 +109,7 @@ for (current_sample in unique_samples) {
     # Add your specific analogue sites on top
     geom_sf(data = single_sample_data, aes(color = distance), size = 1.5) +
     # Focus on the DB region
-    coord_sf(ylim = c(min(coor$Latitude), 90)) +
+    coord_sf(ylim = ylim, xlim = xlim) +
     # The continuous colormap
     scale_color_viridis_c(option = "viridis", name = "Analogue\nDistance",
                           limits = c(min_dist, max_dist)) +
@@ -131,8 +135,7 @@ blank_map <- ggplot() +
   geom_sf(data = empty_world, fill = "gray90", color = "white") +
   geom_sf(data = empty_ref, color = "red", size = 2.5, shape = 4) +
   geom_sf(data = empty_sf, aes(color = distance)) +
-  coord_sf(xlim = c(min(coor$Longitude), max(coor$Longitude)),
-           ylim = c(min(coor$Latitude), 90)) +
+  coord_sf(ylim = ylim, xlim = xlim) +
   scale_color_viridis_c(option = "viridis", name = "Analogue\nDistance",
                         limits = c(min_dist, max_dist)) +
   theme_bw() +
